@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans:beans xmlns="http://www.springframework.org/schema/security"
+	xmlns:beans="http://www.springframework.org/schema/beans"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+	http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+	http://www.springframework.org/schema/security
+	http://www.springframework.org/schema/security/spring-security-4.2.xsd
+	http://www.springframework.org/schema/context 
+	http://www.springframework.org/schema/context/spring-context.xsd
+	http://www.springframework.org/schema/tx
+	http://www.springframework.org/schema/tx/spring-tx.xsd">
+	
+	<context:component-scan base-package="pl.java.spring.gallery" />
+	<context:annotation-config />
+	
+	<!--Security configuration-->
+	<beans:bean id="userCredentialsAuthenticationProvider" class="pl.java.spring.gallery.security.UserCredentialsAuthenticationProvider" />
+	<beans:bean id="tokenAuthenticationProvider" class="pl.java.spring.gallery.security.TokenAuthenticationProvider" />
+	
+	<authentication-manager id="authenticationManagerWebservice" alias="authenticationManagerWebservice">
+	  <authentication-provider ref="userCredentialsAuthenticationProvider" />
+	  <authentication-provider ref="tokenAuthenticationProvider" />
+	</authentication-manager>
+	
+	<beans:bean id="webserviceFilter" class="pl.java.spring.gallery.security.AuthenticationFilter" >
+		<beans:constructor-arg ref = "authenticationManagerWebservice"/>
+	</beans:bean>
+	
+	<beans:bean id="webserviceFilterChain" class="org.springframework.security.web.FilterChainProxy">
+        <filter-chain-map request-matcher="ant">
+            <filter-chain pattern="/webservice/**" filters="webserviceFilter"/>
+        </filter-chain-map>
+	</beans:bean>
+	
+	
+	<http pattern="/webservice/insert**" security="none" />
+	
+	<http auto-config="true" pattern="/webservice/**" authentication-manager-ref="authenticationManagerWebservice" use-expressions="true">
+		<custom-filter after="LOGOUT_FILTER" ref="webserviceFilter" />
+		<intercept-url pattern="/webservice/**" access="permitAll"/>
+		<csrf disabled="true"/>
+		<http-basic/>
+	</http>
+	
+	<authentication-manager alias="authenticationManager" id="authenticationManager" erase-credentials="false">
+   		<authentication-provider>
+   		<password-encoder hash="md5"/>
+ 		<jdbc-user-service data-source-ref="dataSource"
+   			users-by-username-query=
+     		"SELECT name username, pass password, 1 enabled FROM user WHERE name LIKE ?"
+   			authorities-by-username-query=
+     		"SELECT name username, &quot;ROLE_USER&quot; authority FROM user WHERE name LIKE ?  " />
+  		 </authentication-provider>
+ 	</authentication-manager>
+ 	
+ 	<http auto-config="true" use-expressions="true" pattern="/**" authentication-manager-ref="authenticationManager">
+    	<form-login
+    		login-page="/"
+        	default-target-url="/home"
+        	authentication-failure-url="/?error=1"
+        	username-parameter="username"
+        	password-parameter="password" 
+        	login-processing-url="/login"/>
+        	<access-denied-handler error-page="/?error=2" />
+    	<logout logout-success-url="/" />
+    	<intercept-url pattern="/home*" access="hasRole('ROLE_USER')" />
+    	<csrf />
+	</http>
+	
+	<!--Db configuration-->
+	<beans:bean id="entityManagerFactory"
+ 		class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+    	<beans:property name="dataSource" ref="dataSource" />
+    	<beans:property name="packagesToScan" value="pl.java.spring.gallery.dao" />
+    	<beans:property name="jpaVendorAdapter">
+        	<beans:bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter">
+            	<beans:property name="showSql" value="true" />
+            	<beans:property name="generateDdl" value="true" />
+            	<beans:property name="databasePlatform" value="org.hibernate.dialect.MySQLDialect" />
+        	</beans:bean>
+    	</beans:property>
+    	<beans:property name="persistenceUnitName" value="myPersistenceUnit" />
+    	<beans:property name="jpaProperties">
+    		<beans:props>
+    			<beans:prop key="spring.jpa.generate-ddl">true</beans:prop>
+    			<beans:prop key="spring.jpa.hibernate.ddl-auto">create</beans:prop>
+    			<beans:prop key="spring.jpa.properties.javax.persistence.schema-generation.action">create</beans:prop>
+    		</beans:props>
+    	</beans:property>
+	</beans:bean>
+	
+	<beans:bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+    	<beans:property name="driverClassName" value="com.mysql.jdbc.Driver" />
+    	<beans:property name="url" value="jdbc:mysql://localhost:3306/gallerydb?createDatabaseIfNotExist=true" /> <!--!!!!Db url!!!!!!-->
+    	<beans:property name="username" value="root" />
+    	<beans:property name="password" value="root" />
+	</beans:bean>
+	
+
+	
+	<beans:bean class="org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor" />
+	<beans:bean class="org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor" />
+	<beans:bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+    	<beans:property name="entityManagerFactory" ref="entityManagerFactory" />
+	</beans:bean>
+	
+	
+	
+</beans:beans>
+
